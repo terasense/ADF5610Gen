@@ -1,15 +1,15 @@
 //
-// ADF6510 controller
+// ADF5610 controller
 //
 
-#include "ADF6510.h"
+#include "ADF5610.h"
 #include "ArBtn.h"
 #include "QEnc.h"
 #include "SSD1305_SPI_Adaptor.h"
 #include "glcd_fonts.h"
 #include "nv_utils.h"
 
-// ADF6510 interface enable pin
+// ADF5610 interface enable pin
 #define SEN_PIN 17
 
 // Rotary encoder knob (with button)
@@ -33,7 +33,7 @@
 Btn                 g_btn(BT_PIN);
 QEnc                g_enc(PIN_A, PIN_B);
 SSD1305_SPI_Adaptor g_display(CS_PIN, RST_PIN, DC_PIN);
-ADF6510             g_adf(SEN_PIN);
+ADF5610             g_adf(SEN_PIN);
 
 bool     g_initialized = false;
 bool     g_locked      = false;
