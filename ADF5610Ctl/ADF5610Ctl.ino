@@ -143,10 +143,15 @@ static const char* get_status_string()
 
 static void display_status()
 {
-  const char* sta = get_status_string();
-  const char* rem = g_remote ? "rem" : "";
-  glcd_print_str_w(&g_display, 0, 0, STATUS_WIDTH, sta, &g_font_Tahoma15x16, 2);
-  glcd_print_str_w(&g_display, 0, 2, STATUS_WIDTH, rem, &g_font_Tahoma15x16, 2); 
+  glcd_print_str_w(&g_display, 0, 0, STATUS_WIDTH, get_status_string(), &g_font_Tahoma15x16, 2);
+  if (g_remote)
+    glcd_print_str_w(&g_display, 0, 2, STATUS_WIDTH, "rem", &g_font_Tahoma15x16, 2);
+  else if (g_fmul > 1) {
+    String smult('*');
+    smult += g_fmul;
+    glcd_print_str_w(&g_display, 0, 2, STATUS_WIDTH, smult.c_str(), &g_font_Tahoma12x11Bld, 1);
+  } else
+    g_display.clear_region(0, 2, STATUS_WIDTH, 2);
 }
 
 void setup()
