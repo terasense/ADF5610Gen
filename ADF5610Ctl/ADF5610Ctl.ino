@@ -75,9 +75,10 @@ static void init_nv_params()
   bool fmul_valid = nv_get(&g_fmul,   sizeof(g_fmul),   FMUL_ADDR);
   if (!out_valid || !freq_valid || !fmul_valid || !g_fmul) {
     // falback to defaults to be on the safe side
+    if (!g_fmul)
+      g_fmul = 1;
+    g_freq = DEF_FREQ * (uint32_t)g_fmul;
     g_out_on = false;
-    g_freq = DEF_FREQ;
-    g_fmul = 1;
   }
 }
 
