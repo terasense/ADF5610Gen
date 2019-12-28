@@ -85,7 +85,7 @@ static void adf_set_freq()
 {
   if (!g_adf.set_freq(g_freq, g_fmul)) {
     // Invalid frequency. Reset to default.
-    g_freq = DEF_FREQ * g_fmul;
+    g_freq = DEF_FREQ * (uint32_t)g_fmul;
     g_out_on = false;
     g_adf.vco_disable();
   }
