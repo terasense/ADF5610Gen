@@ -25,25 +25,31 @@
 // EEPROM addresses
 #define ON_ADDR   0x10
 #define FREQ_ADDR 0x20
+#define FMUL_ADDR 0x30
 
 #define TIMER_PERIOD 500 // usec
 #define DEF_FREQ 10000 // MHz
 #define UNITS "MHz"
 
-Btn                 g_btn(BT_PIN);
-QEnc                g_enc(PIN_A, PIN_B);
-SSD1305_SPI_Adaptor g_display(CS_PIN, RST_PIN, DC_PIN);
-ADF5610             g_adf(SEN_PIN);
+#define BAUDS 9600
+#define IDLE_DELAY 50 // msec
 
-bool     g_initialized = false;
-bool     g_locked      = false;
-bool     g_out_on      = false;
-bool     g_failed      = false;
-bool     g_tune        = false;
-uint16_t g_freq        = DEF_FREQ; // Mhz
-int32_t  g_tune_val    = 0;
-uint16_t g_tune_step   = 100; // Possible values: 1,10,100,1000
-uint8_t  g_tune_pos    = 2;   // tune_step = 10^tune_pos
+static Btn                 g_btn(BT_PIN);
+static QEnc                g_enc(PIN_A, PIN_B);
+static SSD1305_SPI_Adaptor g_display(CS_PIN, RST_PIN, DC_PIN);
+static ADF5610             g_adf(SEN_PIN);
+
+static bool     g_initialized = false;
+static bool     g_locked      = false;
+static bool     g_out_on      = false;
+static bool     g_failed      = false;
+static bool     g_remote      = false;
+static bool     g_tune        = false;
+static uint32_t g_freq        = DEF_FREQ; // Mhz
+static uint8_t  g_fmul        = 1;
+static int32_t  g_tune_val    = 0;
+static uint16_t g_tune_step   = 100; // Possible values: 1,10,100,1000
+static uint8_t  g_tune_pos    = 2;   // tune_step = 10^tune_pos
 
 #define MAX_STEP 1000
 #define ENC_DIV  2 // encoder divider
@@ -54,7 +60,7 @@ ISR(TIMER1_OVF_vect)
   g_enc.poll();
 }
 
-void timer_init(unsigned us_period)
+static void timer_init(unsigned us_period)
 {
   TCCR1A = 0;  // clear control register A 
   ICR1 = (F_CPU / 2000000) * us_period; // it will count up/down
@@ -62,29 +68,35 @@ void timer_init(unsigned us_period)
   TIMSK1 = _BV(TOIE1); // enable interrupt
 }
 
-void init_nv_params()
+static void init_nv_params()
 {
   bool out_valid  = nv_get(&g_out_on, sizeof(g_out_on), ON_ADDR);
-  bool freq_valid = nv_get(&g_freq, sizeof(g_freq), FREQ_ADDR);
-  if (!out_valid || !freq_valid)
+  bool freq_valid = nv_get(&g_freq,   sizeof(g_freq),   FREQ_ADDR);
+  bool fmul_valid = nv_get(&g_fmul,   sizeof(g_fmul),   FMUL_ADDR);
+  if (!out_valid || !freq_valid || !fmul_valid || !g_fmul) {
+    // falback to defaults to be on the safe side
     g_out_on = false;
+    g_freq = DEF_FREQ;
+    g_fmul = 1;
+  }
 }
 
-void adf_set_freq()
+static void adf_set_freq()
 {
-  if (!g_adf.set_freq(g_freq)) {
+  if (!g_adf.set_freq(g_freq, g_fmul)) {
     // Invalid frequency. Reset to default.
-    g_freq = DEF_FREQ;
+    g_freq = DEF_FREQ * g_fmul;
     g_out_on = false;
     g_adf.vco_disable();
   }
 }
 
-void adf_init()
+static void adf_init()
 {
   g_adf.begin();
   if (!g_adf.probe()) {
     g_failed = true;
+    g_out_on = false;
     return;
   }
   g_adf.init();
@@ -96,7 +108,7 @@ void adf_init()
   g_initialized = true;
 }
 
-void adf_poll_status()
+static void adf_poll_status()
 {
   g_failed = !g_adf.probe();
   g_locked = g_adf.lock_status();
@@ -104,7 +116,7 @@ void adf_poll_status()
 
 #define STATUS_WIDTH 32
 
-void display_freq()
+static void display_freq()
 {
   String sfreq(g_freq);
   sfreq += UNITS;
@@ -117,23 +129,29 @@ void display_freq()
   glcd_print_str_r_ex(&g_display, STATUS_WIDTH, 1, g_display.width() - STATUS_WIDTH, sfreq.c_str(), &g_font_Tahoma19x20, 1, patches);
 }
 
-void display_status()
+static const char* get_status_string()
 {
-  const char* sta;
   if (!g_initialized || g_failed)
-    sta = "Err";
+    return "Err";
   else if (!g_out_on)
-    sta = "Off";
+    return "Off";
   else if (!g_locked)
-    sta = "On";
+    return "On";
   else
-    sta = "ON";
+    return "ON";
+}
+
+static void display_status()
+{
+  const char* sta = get_status_string();
+  const char* rem = g_remote ? "rem" : "";
   glcd_print_str_w(&g_display, 0, 0, STATUS_WIDTH, sta, &g_font_Tahoma15x16, 2);
+  glcd_print_str_w(&g_display, 0, 2, STATUS_WIDTH, rem, &g_font_Tahoma15x16, 2); 
 }
 
 void setup()
 {
-  Serial.begin(9600);
+  Serial.begin(BAUDS);
   init_nv_params();
   g_btn.begin();
   g_enc.begin();
@@ -147,7 +165,7 @@ void setup()
   display_status();
 }
 
-void switch_tune_mode()
+static void switch_tune_mode()
 {
   g_tune = !g_tune;
   if (g_tune)
@@ -157,7 +175,7 @@ void switch_tune_mode()
   display_freq();
 }
 
-void tune_switch_step()
+static void tune_switch_step()
 {
   if (g_tune_step == MAX_STEP) {
       g_tune_step = 1;
@@ -169,19 +187,20 @@ void tune_switch_step()
   display_freq();
 }
 
-void do_tune()
+static void do_tune()
 {
   int32_t val = g_enc.value() / ENC_DIV;
   if (val == g_tune_val)
     return;
-  uint16_t freq = g_freq + (val - g_tune_val) * g_tune_step;
+  uint32_t freq = g_freq + (val - g_tune_val) * g_tune_step;
   g_tune_val = val;
   if (g_btn.is_pressed())
     return;
-  if (freq < FMIN_MHZ)
-    freq = FMIN_MHZ;
-  if (freq > FMAX_MHZ)
-    freq = FMAX_MHZ;
+  uint32_t limit;
+  if (freq < (limit = FMIN_MHZ * (uint32_t)g_fmul))
+    freq = limit;
+  if (freq > (limit = FMAX_MHZ * (uint32_t)g_fmul))
+    freq = limit;
   if (g_freq == freq)
     return;
   g_freq = freq;
@@ -190,7 +209,7 @@ void do_tune()
   display_freq();
 }
 
-void switch_output()
+static void switch_output()
 {
   g_out_on = !g_out_on;
   if (!g_out_on)
@@ -202,8 +221,14 @@ void switch_output()
   nv_put(&g_out_on, sizeof(g_out_on), ON_ADDR);
 }
 
-void check_events()
+static void check_events()
 {
+  if (g_remote) {
+    if (g_btn.get_event() == bt_long_pressed) {
+      g_remote = false;
+    }
+    return;
+  }
   switch(g_btn.get_event()) {
     case bt_released:
       if (!g_tune)
@@ -221,11 +246,200 @@ void check_events()
     do_tune();
 }
 
+static String g_rx_buff;
+static const char* g_cmd_info =
+"Commands available:\n"
+"i      - Identify. Returns <model> <min MHz> <max MHz>\n"
+"v      - Returns major.minor version followed by build date\n"
+"f<MHz> - Set frequency\n"
+"m<Mul> - Set frequency multiplier\n"
+"o(0|1) - Turns output on (1) or off (0)\n"
+"l(0|1) - Lock (1) or unlock (0). While locked manual controls are disabled\n"
+"         Commands f, m, o, l without parameter return the value currently set\n"
+"p      - Persist current frequency and output status (to be restored on next power on)\n"
+"s      - Returns current status as Off|ON|On|Err. The 'On' status is the same\n"
+"         as 'ON' but with the former the frequency is not locked to desired value\n"
+"?      - This help\n"
+"On success all commands return empty line. On error the line with either !INVALID\n"
+"(command error) or !FAILED (device error) will be returned.\n"
+"Copyright 2019-2020 TeraSense Group, Inc.\n"
+;
+
+#define VERSION "1.0"
+#define MODEL "ADF5610"
+#define INVAL_RESP "!INVALID"
+#define FAIL_RESP  "!FAILED"
+
+static void cli_freq(String &cmd)
+{
+  if (!cmd.length()) {
+    Serial.println(g_freq);
+    return;
+  }
+  uint32_t freq = cmd.toInt();
+  if (freq < FMIN_MHZ * (uint32_t)g_fmul || FMAX_MHZ * (uint32_t)g_fmul < freq) {
+    Serial.println(INVAL_RESP);
+    return;
+  }
+  g_freq = freq;  
+  if (g_out_on)
+    adf_set_freq();
+  display_freq();
+  Serial.println();
+}
+
+static void cli_fmul(String &cmd)
+{
+  if (!cmd.length()) {
+    Serial.println(g_fmul);
+    return;
+  }
+  uint8_t mul = cmd.toInt();
+  if (!mul) {
+    Serial.println(INVAL_RESP);
+    return;
+  }
+  g_freq = (g_freq / g_fmul) * mul;
+  g_fmul = mul;
+  nv_put(&g_freq, sizeof(g_freq), FREQ_ADDR);
+  nv_put(&g_fmul, sizeof(g_fmul), FMUL_ADDR);
+  if (g_out_on)
+    adf_set_freq();
+  display_freq();
+  Serial.println();
+}
+
+static void cli_outp(String &cmd)
+{
+  if (!cmd.length()) {
+    Serial.println(g_out_on ? '1' : '0');
+    return;
+  }
+  switch (cmd.charAt(0)) {
+    case '0':
+      if (g_out_on) {
+        g_out_on = false;
+        g_adf.vco_disable();
+      }
+      Serial.println();
+      break;
+    case '1':
+      if (g_failed) {
+        Serial.println(FAIL_RESP);
+        break;
+      }
+      if (!g_out_on) {
+        g_out_on = true;
+        g_adf.vco_enable();
+        adf_set_freq();
+      }
+      Serial.println();
+      break;
+    default:
+      Serial.println(INVAL_RESP);
+  }
+}
+
+static void cli_lock(String &cmd)
+{
+  if (!cmd.length()) {
+    Serial.println(g_remote ? '1' : '0');
+    return;
+  }
+  switch (cmd.charAt(0)) {
+    case '0':
+      g_remote = false;
+      Serial.println();
+      break;
+    case '1':
+      g_remote = true;
+      g_tune = false;
+      display_freq();
+      Serial.println();
+      break;
+    default:
+      Serial.println(INVAL_RESP);
+  }
+}
+
+static void cli_persist()
+{
+  nv_put(&g_freq, sizeof(g_freq), FREQ_ADDR);
+  nv_put(&g_out_on, sizeof(g_out_on), ON_ADDR);
+  Serial.println();
+}
+
+static void cli_process_cmd(String &cmd)
+{
+  char tag = cmd.charAt(0);
+  cmd.remove(0, 1);
+  switch (tag) {
+    case '?':
+      Serial.println(g_cmd_info);
+      break;
+    case 'i':
+      Serial.print(MODEL);
+      Serial.print(' ');
+      Serial.print(FMIN_MHZ);
+      Serial.print(' ');
+      Serial.println(FMAX_MHZ);
+      break;
+    case 'v':
+      Serial.println(VERSION " " __DATE__);
+      break;
+    case 's':
+      Serial.println(get_status_string());
+      break;
+    case 'f':
+      cli_freq(cmd);
+      break;
+    case 'm':
+      cli_fmul(cmd);
+      break;
+    case 'o':
+      cli_outp(cmd);
+      break;
+    case 'l':
+      cli_lock(cmd);
+      break;
+    case 'p':
+      cli_persist();
+      break;
+    default:
+      Serial.println(INVAL_RESP);
+  }
+}
+
+static void serial_process()
+{
+  if (!Serial.available())
+    return;
+
+  char c;
+  while (Serial.available()) {
+    c = Serial.read();
+    g_rx_buff += c;
+  }
+  // check command is completed
+  if (c != '\n' && c != '\r')
+    return;
+
+  // trim white space characters
+  String cmd = g_rx_buff;
+  g_rx_buff = String();
+  cmd.trim();
+
+  // process remaining symbols
+  if (cmd.length())
+    cli_process_cmd(cmd);
+}
+
 void loop() {
+  serial_process();
   if (g_initialized) {
     check_events();
     adf_poll_status();
     display_status();
   }
-  delay(100);
+  delay(IDLE_DELAY);
 }
