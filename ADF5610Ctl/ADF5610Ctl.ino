@@ -121,6 +121,7 @@ static void display_freq()
 {
   String sfreq(g_freq);
   sfreq += UNITS;
+  sfreq.remove(8);
   int len = sfreq.length();
   struct glcd_patch patches[len] = {};
   if (g_tune) {
