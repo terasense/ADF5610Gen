@@ -5,9 +5,9 @@
 #include "ADF5610.h"
 #include "ArBtn.h"
 #include "QEnc.h"
+#include "NvTx.h"
 #include "SSD1305_SPI_Adaptor.h"
 #include "glcd_fonts.h"
-#include "nv_utils.h"
 
 // ADF5610 interface enable pin
 #define SEN_PIN 17
@@ -70,10 +70,10 @@ static void timer_init(unsigned us_period)
 
 static void init_nv_params()
 {
-  bool out_valid  = nv_get(&g_out_on, sizeof(g_out_on), ON_ADDR);
-  bool freq_valid = nv_get(&g_freq,   sizeof(g_freq),   FREQ_ADDR);
-  bool fmul_valid = nv_get(&g_fmul,   sizeof(g_fmul),   FMUL_ADDR);
-  if (!out_valid || !freq_valid || !fmul_valid || !g_fmul) {
+  bool out_valid  = NvTxGet(g_out_on, ON_ADDR);
+  bool freq_valid = NvTxGet(g_freq,   FREQ_ADDR);
+  bool fmul_valid = NvTxGet(g_fmul,   FMUL_ADDR);
+  if (!out_valid || !freq_valid || !g_fmul) {
     // falback to defaults to be on the safe side
     if (!g_fmul)
       g_fmul = 1;
@@ -178,7 +178,7 @@ static void switch_tune_mode()
   if (g_tune)
     g_tune_val = g_enc.value() / ENC_DIV;
   else
-    nv_put(&g_freq, sizeof(g_freq), FREQ_ADDR);
+    NvTxPut(g_freq, FREQ_ADDR);
   display_freq();
 }
 
@@ -225,7 +225,7 @@ static void switch_output()
     g_adf.vco_enable();
     adf_set_freq();
   }
-  nv_put(&g_out_on, sizeof(g_out_on), ON_ADDR);
+  NvTxPut(g_out_on, ON_ADDR);
 }
 
 static void check_events()
@@ -308,8 +308,8 @@ static void cli_fmul(String &cmd)
   }
   g_freq = (g_freq / g_fmul) * mul;
   g_fmul = mul;
-  nv_put(&g_freq, sizeof(g_freq), FREQ_ADDR);
-  nv_put(&g_fmul, sizeof(g_fmul), FMUL_ADDR);
+  NvTxPut(g_freq, FREQ_ADDR);
+  NvTxPut(g_fmul, FMUL_ADDR);
   if (g_out_on)
     adf_set_freq();
   display_freq();
@@ -371,8 +371,8 @@ static void cli_lock(String &cmd)
 
 static void cli_persist()
 {
-  nv_put(&g_freq, sizeof(g_freq), FREQ_ADDR);
-  nv_put(&g_out_on, sizeof(g_out_on), ON_ADDR);
+  NvTxPut(g_freq, FREQ_ADDR);
+  NvTxPut(g_out_on, ON_ADDR);
   Serial.println();
 }
 
