@@ -22,11 +22,6 @@
 #define DC_PIN  15
 #define RST_PIN 16
 
-// EEPROM addresses
-#define ON_ADDR   0x10
-#define FREQ_ADDR 0x20
-#define FMUL_ADDR 0x30
-
 #define TIMER_PERIOD 500 // usec
 #define DEF_FREQ 10000 // MHz
 #define UNITS "MHz"
@@ -51,8 +46,13 @@ static int32_t  g_tune_val    = 0;
 static uint16_t g_tune_step   = 100; // Possible values: 1,10,100,1000
 static uint8_t  g_tune_pos    = 2;   // tune_step = 10^tune_pos
 
-#define MAX_STEP 1000
-#define ENC_DIV  2 // encoder divider
+// Assign EEPROM addresses
+NvPlace(g_out_on, 0x10);
+NvAfter(g_freq, g_out_on);
+NvAfter(g_fmul, g_freq);
+
+#define MAX_STEP 1000 // in freq tuning mode
+#define ENC_DIV  2    // encoder divider
 
 ISR(TIMER1_OVF_vect)
 {
@@ -70,9 +70,9 @@ static void timer_init(unsigned us_period)
 
 static void init_nv_params()
 {
-  bool out_valid  = NvTxGet(g_out_on, ON_ADDR);
-  bool freq_valid = NvTxGet(g_freq,   FREQ_ADDR);
-  bool fmul_valid = NvTxGet(g_fmul,   FMUL_ADDR);
+  bool out_valid  = NvTxGet(g_out_on);
+  bool freq_valid = NvTxGet(g_freq);
+  bool fmul_valid = NvTxGet(g_fmul);
   if (!out_valid || !freq_valid || !g_fmul) {
     // falback to defaults to be on the safe side
     if (!g_fmul)
@@ -178,7 +178,7 @@ static void switch_tune_mode()
   if (g_tune)
     g_tune_val = g_enc.value() / ENC_DIV;
   else
-    NvTxPut(g_freq, FREQ_ADDR);
+    NvTxPut(g_freq);
   display_freq();
 }
 
@@ -225,7 +225,7 @@ static void switch_output()
     g_adf.vco_enable();
     adf_set_freq();
   }
-  NvTxPut(g_out_on, ON_ADDR);
+  NvTxPut(g_out_on);
 }
 
 static void check_events()
@@ -308,8 +308,8 @@ static void cli_fmul(String &cmd)
   }
   g_freq = (g_freq / g_fmul) * mul;
   g_fmul = mul;
-  NvTxPut(g_freq, FREQ_ADDR);
-  NvTxPut(g_fmul, FMUL_ADDR);
+  NvTxPut(g_freq);
+  NvTxPut(g_fmul);
   if (g_out_on)
     adf_set_freq();
   display_freq();
@@ -371,8 +371,8 @@ static void cli_lock(String &cmd)
 
 static void cli_persist()
 {
-  NvTxPut(g_freq, FREQ_ADDR);
-  NvTxPut(g_out_on, ON_ADDR);
+  NvTxPut(g_freq);
+  NvTxPut(g_out_on);
   Serial.println();
 }
 
