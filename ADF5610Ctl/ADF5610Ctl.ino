@@ -47,7 +47,10 @@ static uint16_t g_tune_step   = 100; // Possible values: 1,10,100,1000
 static uint8_t  g_tune_pos    = 2;   // tune_step = 10^tune_pos
 
 // Assign EEPROM addresses
-NvPlace(g_out_on, 0x10);
+
+#define INST_ID 0x1111
+
+NvPlace(g_out_on, 0x10, INST_ID);
 NvAfter(g_freq, g_out_on);
 NvAfter(g_fmul, g_freq);
 
