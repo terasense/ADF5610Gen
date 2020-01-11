@@ -257,23 +257,23 @@ static void check_events()
 }
 
 static String g_rx_buff;
-static const char* g_cmd_info =
-"Commands available:\n"
-"i      - Identify. Returns <model> <min MHz> <max MHz>\n"
-"v      - Returns major.minor version followed by build date\n"
-"f<MHz> - Set frequency\n"
-"m<Mul> - Set frequency multiplier\n"
-"o(0|1) - Turns output on (1) or off (0)\n"
-"l(0|1) - Lock (1) or unlock (0). While locked manual controls are disabled\n"
-"         Commands f, m, o, l without parameter return the value currently set\n"
-"p      - Persist current frequency and output status (to be restored on next power on)\n"
-"s      - Returns current status as Off|ON|On|Err. The 'On' status is the same\n"
-"         as 'ON' but with the former the frequency is not locked to desired value\n"
-"?      - This help\n"
-"On success all commands return empty line. On error the line with either !INVALID\n"
-"(command error) or !FAILED (device error) will be returned.\n"
+
+#define HELP \
+"Commands available:\n" \
+"i      - Identify. Returns <model> <min MHz> <max MHz>\n" \
+"v      - Returns major.minor version followed by build date\n" \
+"f<MHz> - Set frequency\n" \
+"m<Mul> - Set frequency multiplier\n" \
+"o(0|1) - Turns output on (1) or off (0)\n" \
+"l(0|1) - Lock (1) or unlock (0). While locked manual controls are disabled\n" \
+"         Commands f, m, o, l without parameter return the value currently set\n" \
+"p      - Persist current frequency and output status (to be restored on next power on)\n" \
+"s      - Returns current status as Off|ON|On|Err. The 'On' status is the same\n" \
+"         as 'ON' but with the former the frequency is not locked to desired value\n" \
+"?      - This help\n" \
+"On success all commands return empty line. On error the line with either !INVALID\n" \
+"(command error) or !FAILED (device error) will be returned.\n" \
 "Copyright 2019-2020 TeraSense Group, Inc.\n"
-;
 
 #define VERSION "1.0"
 #define MODEL "ADF5610"
@@ -385,7 +385,7 @@ static void cli_process_cmd(String &cmd)
   cmd.remove(0, 1);
   switch (tag) {
     case '?':
-      Serial.println(g_cmd_info);
+      Serial.println(F(HELP));
       break;
     case 'i':
       Serial.print(MODEL);
