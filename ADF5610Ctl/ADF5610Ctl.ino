@@ -420,23 +420,30 @@ static void cli_process_cmd(String &cmd)
   }
 }
 
+#define MAX_CMD_LEN 32
+
 static void serial_process()
 {
-  if (!Serial.available())
-    return;
-
-  char c;
+  char c = 0;
   while (Serial.available()) {
     c = Serial.read();
-    g_rx_buff += c;
+    if (g_rx_buff.length() <= MAX_CMD_LEN)
+      g_rx_buff += c;
   }
   // check command is completed
   if (c != '\n' && c != '\r')
     return;
 
-  // trim white space characters
+  // make the copy of the buffer
   String cmd = g_rx_buff;
   g_rx_buff = String();
+
+  if (cmd.length() > MAX_CMD_LEN) {
+    Serial.println(INVAL_RESP);
+    return;
+  }
+
+  // trim white space characters
   cmd.trim();
 
   // process remaining symbols
