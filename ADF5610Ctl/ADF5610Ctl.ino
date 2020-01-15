@@ -30,6 +30,7 @@
 #define BAUDS 9600
 #define IDLE_DELAY 50 // msec
 
+#define HOSTNAME "TeraS"
 #define DHCP_TOUT 10000
 #define TELNET_PORT 23
 #define MAX_CMD_LEN 32
@@ -191,7 +192,7 @@ static void telnet_init()
   mac[0] |= 2;
   g_eth_initing = true;
   display_status();
-  if (Ethernet.begin(mac, DHCP_TOUT))
+  if (Ethernet.begin(mac, HOSTNAME, DHCP_TOUT))
     g_telnet_srv.start();
   g_eth_initing = false;
 }
@@ -318,6 +319,7 @@ static void check_events()
 "s      - Get current status as Off|ON|On|Err. The 'On' status is the same\r\n" \
 "         as 'ON' but with the former the frequency is not locked to desired value\r\n" \
 "a      - Get current IP address\r\n" \
+"n      - Get hostname\r\n" \
 "?      - This help\r\n" \
 "On success all commands return empty line. On error the line with either !INVALID\r\n" \
 "(command error) or !FAILED (device error) will be returned.\r\n" \
@@ -454,6 +456,12 @@ static void cli_process_cmd(String &cmd, Print &out)
       else
         out.println("0.0.0.0");
       break;
+    case 'n': {
+      char buff[HOSTNAME_LEN+1] = {};
+      Ethernet.getHostname(buff);
+      out.println(buff);
+      break;
+    }
     case 'f':
       cli_freq(cmd, out);
       break;
