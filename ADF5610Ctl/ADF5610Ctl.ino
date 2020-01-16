@@ -131,6 +131,7 @@ static void adf_poll_status()
 }
 
 #define STATUS_WIDTH 45
+#define INFO_MARGIN  7
 
 static void display_freq()
 {
@@ -141,7 +142,7 @@ static void display_freq()
     struct glcd_patch tune_marker = {.type = patch_strike, .where = 2, .param = 0xf0};
     patches[len-1-g_tune_pos] = tune_marker;
   }
-  glcd_print_str_r_ex(&g_display, STATUS_WIDTH, 1, g_display.width() - STATUS_WIDTH, sfreq.c_str(), &g_font_Tahoma19x20D, 1, patches);
+  glcd_print_str_r_ex(&g_display, STATUS_WIDTH, 1, g_display.width() - STATUS_WIDTH, sfreq.c_str(), &g_font_Tahoma19x20dg, 1, patches);
 }
 
 static const char* get_status_string()
@@ -155,27 +156,29 @@ static const char* get_status_string()
   return "ON";
 }
 
-static void show_info(const char* str)
+static inline void show_info(const char* str, struct glcd_font const* font)
 {
-  if (str)
-  	glcd_print_str_w(&g_display, 0, 2, STATUS_WIDTH, str, &g_font_Tahoma15x16, 2);
-  else
-  	g_display.clear_region(0, 2, STATUS_WIDTH, 2);
+  glcd_print_str_w(&g_display, INFO_MARGIN, 2, STATUS_WIDTH-INFO_MARGIN, str, font, 2);
+}
+
+static inline void clear_info()
+{
+  g_display.clear_region(0, 2, STATUS_WIDTH, 2);
 }
 
 static void display_status()
 {
   glcd_print_str_w(&g_display, 0, 0, STATUS_WIDTH, get_status_string(), &g_font_Tahoma15x16, 2);
   if (g_eth_initing)
-    show_info("eth");
+    show_info("eth", &g_font_Tahoma15x16);
   else if (g_remote)
-    show_info("rem");
+    show_info("rem", &g_font_Tahoma15x16);
   else if (g_fmul > 1) {
     String smult('*');
     smult += g_fmul;
-    show_info(smult.c_str());
+    show_info(smult.c_str(), &g_font_Tahoma12x11BldD);
   } else
-    show_info(0);
+    clear_info();
 }
 
 static void telnet_init()
