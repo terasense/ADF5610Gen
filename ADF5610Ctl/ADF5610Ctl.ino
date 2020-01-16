@@ -318,8 +318,10 @@ static void check_events()
 "p      - Persist current frequency and output status (to be restored on next power on)\r\n" \
 "s      - Get current status as Off|ON|On|Err. The 'On' status is the same\r\n" \
 "         as 'ON' but with the former the frequency is not locked to desired value\r\n" \
-"a      - Get current IP address\r\n" \
-"n      - Get hostname\r\n" \
+"n      - Get hostname. It may be used to access device by Telnet over the LAN.\r\n" \
+"a      - Get current IP address. It is acquired via DHCP on connecting to Ethernet.\r\n" \
+"         The reliable network configuration should have IP address statically bound\r\n" \
+"         to device MAC address.\r\n" \
 "?      - This help\r\n" \
 "On success all commands return empty line. On error the line with either !INVALID\r\n" \
 "(command error) or !FAILED (device error) will be returned.\r\n" \
