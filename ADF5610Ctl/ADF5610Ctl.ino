@@ -34,6 +34,7 @@
 #define DHCP_TOUT 10000
 #define TELNET_PORT 23
 #define MAX_CMD_LEN 32
+#define MAX_PWD_LEN 16
 
 static Btn                 g_btn(BT_PIN);
 static QEnc                g_enc(PIN_A, PIN_B);
@@ -55,6 +56,10 @@ static int32_t  g_tune_val    = 0;
 static uint16_t g_tune_step   = 100; // Possible values: 1,10,100,1000
 static uint8_t  g_tune_pos    = 2;   // tune_step = 10^tune_pos
 
+static char     g_pwd[MAX_PWD_LEN];
+static bool     g_has_pwd;
+static bool     g_auth;
+
 static String    g_rx_buff;
 static TelNetSrv g_telnet_srv(TELNET_PORT, MAX_CMD_LEN);
 
@@ -65,6 +70,7 @@ static TelNetSrv g_telnet_srv(TELNET_PORT, MAX_CMD_LEN);
 NvPlace(g_out_on, 0x10, INST_ID);
 NvAfter(g_freq, g_out_on);
 NvAfter(g_fmul, g_freq);
+NvAfter(g_pwd, g_fmul); 
 
 #define MAX_STEP 1000 // in freq tuning mode
 #define ENC_DIV  2    // encoder divider
@@ -95,6 +101,7 @@ static void init_nv_params()
     g_freq = DEF_FREQ * (uint32_t)g_fmul;
     g_out_on = false;
   }
+  g_has_pwd = NvTxGet(g_pwd) && g_pwd[0];
 }
 
 static void adf_set_freq()
@@ -200,8 +207,14 @@ static void telnet_init()
   g_eth_initing = false;
 }
 
+static void on_telnet_connect()
+{
+  g_auth = false;
+}
+
 static void eth_init()
 {
+  g_telnet_srv.on_connect(on_telnet_connect);
   Ethernet.begin();
   g_eth_present = (Ethernet.hardwareStatus() != EthernetNoHardware);
   if (!g_eth_present)
@@ -325,6 +338,8 @@ static void check_events()
 "a      - Get current IP address. It is acquired via DHCP on connecting to Ethernet.\r\n" \
 "         The reliable network configuration should have IP address statically bound\r\n" \
 "         to device MAC address.\r\n" \
+"#<PWD> - Authenticate with password\r\n" \
+"P<PWD> - Set new password\r\n" \
 "?      - This help\r\n" \
 "On success all commands return empty line. On error the line with either !INVALID\r\n" \
 "(command error) or !FAILED (device error) will be returned.\r\n" \
@@ -334,6 +349,31 @@ static void check_events()
 #define MODEL "ADF5610"
 #define INVAL_RESP "!INVALID"
 #define FAIL_RESP  "!FAILED"
+
+static void cli_pwd_auth(String &cmd, Print &out)
+{
+  if (!g_has_pwd) {
+    out.println(INVAL_RESP);
+    return;
+  }
+  unsigned pwd_len = cmd.length() + 1;
+  if (pwd_len > MAX_PWD_LEN)
+    pwd_len = MAX_PWD_LEN;
+  g_auth = !memcmp(g_pwd, cmd.c_str(), pwd_len);
+  out.println();
+}
+
+static void cli_pwd_set(String &cmd, Print &out)
+{
+  unsigned pwd_len = cmd.length() + 1;
+  if (pwd_len > MAX_PWD_LEN)
+    pwd_len = MAX_PWD_LEN;
+  memcpy(g_pwd, cmd.c_str(), pwd_len);
+  NvTxPut(g_pwd);
+  g_has_pwd = pwd_len > 1;
+  g_auth = g_has_pwd;
+  out.println();
+}
 
 static void cli_freq(String &cmd, Print &out)
 {
@@ -434,6 +474,11 @@ static void cli_persist(Print &out)
   out.println();
 }
 
+static bool cli_chk_access(Print &out)
+{
+  return !g_has_pwd || g_auth || &out == &Serial;
+}
+
 static void cli_process_cmd(String &cmd, Print &out)
 {
   char tag = cmd.charAt(0);
@@ -441,32 +486,43 @@ static void cli_process_cmd(String &cmd, Print &out)
   switch (tag) {
     case '?':
       out.println(F(HELP));
-      break;
+      return;
     case 'i':
       out.print(MODEL);
       out.print(' ');
       out.print(FMIN_MHZ);
       out.print(' ');
       out.println(FMAX_MHZ);
-      break;
+      return;
     case 'v':
       out.println(VERSION " " __DATE__);
-      break;
+      return;
     case 's':
       out.println(get_status_string());
-      break;
+      return;
     case 'a':
       if (g_eth_online)
         out.println(Ethernet.localIP());
       else
         out.println("0.0.0.0");
-      break;
+      return;
     case 'n': {
       char buff[HOSTNAME_LEN+1] = {};
       Ethernet.getHostname(buff);
       out.println(buff);
-      break;
+      return;
     }
+    case '#':
+      cli_pwd_auth(cmd, out);
+      return;
+    default:
+      break;
+  }
+  if (!cli_chk_access(out)) {
+    out.println(INVAL_RESP);
+    return;    
+  }
+  switch (tag) {
     case 'f':
       cli_freq(cmd, out);
       break;
@@ -481,6 +537,9 @@ static void cli_process_cmd(String &cmd, Print &out)
       break;
     case 'p':
       cli_persist(out);
+      break;
+    case 'P':
+      cli_pwd_set(cmd, out);
       break;
     default:
       out.println(INVAL_RESP);
