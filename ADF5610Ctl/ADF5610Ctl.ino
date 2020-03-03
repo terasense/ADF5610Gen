@@ -36,6 +36,9 @@
 #define MAX_CMD_LEN 32
 #define MAX_PWD_LEN 16
 
+// Uncomment to show multiplier on display
+//#define SHOW_MULT
+
 static Btn                 g_btn(BT_PIN);
 static QEnc                g_enc(PIN_A, PIN_B);
 static SSD1305_SPI_Adaptor g_display(CS_PIN, RST_PIN, DC_PIN);
@@ -180,11 +183,14 @@ static void display_status()
     show_info("eth", &g_font_Tahoma15x16);
   else if (g_remote)
     show_info("rem", &g_font_Tahoma15x16);
+#ifdef SHOW_MULT
   else if (g_fmul > 1) {
     String smult('*');
     smult += g_fmul;
     show_info(smult.c_str(), &g_font_Tahoma12x11BldD);
-  } else
+  }
+#endif
+  else
     clear_info();
 }
 
