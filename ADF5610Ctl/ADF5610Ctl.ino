@@ -158,12 +158,12 @@ static void display_freq()
 static const char* get_status_string()
 {
   if (!g_initialized || g_failed)
-    return "Err";
+    return "err";
   if (!g_out_on)
-    return "Off";
+    return "off";
   if (!g_locked)
-    return "On";
-  return "ON";
+    return "tun";
+  return "on";
 }
 
 static inline void show_info(const char* str, struct glcd_font const* font)
@@ -178,11 +178,11 @@ static inline void clear_info()
 
 static void display_status()
 {
-  glcd_print_str_w(&g_display, 0, 0, STATUS_WIDTH, get_status_string(), &g_font_Tahoma15x16, 2);
+  glcd_print_str_w(&g_display, 0, 0, STATUS_WIDTH, get_status_string(), &g_font_Tahoma15x16Small, 2);
   if (g_eth_initing)
-    show_info("eth", &g_font_Tahoma15x16);
+    show_info("eth", &g_font_Tahoma15x16Small);
   else if (g_remote)
-    show_info("rem", &g_font_Tahoma15x16);
+    show_info("rem", &g_font_Tahoma15x16Small);
 #ifdef SHOW_MULT
   else if (g_fmul > 1) {
     String smult('*');
@@ -338,8 +338,8 @@ static void check_events()
 "l(0|1) - Lock (1) or unlock (0). While locked manual controls are disabled\r\n" \
 "         Commands f, m, o, l without parameter return the value currently set\r\n" \
 "p      - Persist current frequency and output status (to be restored on next power on)\r\n" \
-"s      - Get current status as Off|ON|On|Err. The 'On' status is the same\r\n" \
-"         as 'ON' but with the former the frequency is not locked to desired value\r\n" \
+"s      - Get current status as off|on|tun|err. The 'tun' (tuning) status is the same\r\n" \
+"         as 'on' but with the former the frequency is not locked to desired value\r\n" \
 "n      - Get hostname. It may be used to access device by Telnet over the LAN.\r\n" \
 "a      - Get current IP address. It is acquired via DHCP on connecting to Ethernet.\r\n" \
 "         The reliable network configuration should have IP address statically bound\r\n" \
