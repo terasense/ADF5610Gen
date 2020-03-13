@@ -12,7 +12,7 @@
 #include <avr/boot.h>
 
 // ADF5610 interface enable pin
-#define SEN_PIN 17
+#define SEN_PIN 21
 
 // Rotary encoder knob (with button)
 #define BT_PIN  4
@@ -20,9 +20,9 @@
 #define PIN_B   3
 
 // Display connection
-#define CS_PIN  14
-#define DC_PIN  15
-#define RST_PIN 16
+#define CS_PIN  18
+#define DC_PIN  19
+#define RST_PIN 20
 
 #define TIMER_PERIOD 500 // usec
 #define DEF_FREQ 10000 // MHz
